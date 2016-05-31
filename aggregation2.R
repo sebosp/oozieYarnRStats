@@ -2,6 +2,7 @@
 
 library("dplyr")
 library("lubridate")
+library("ggplot2")
 # Get keys from the graphics device
 X11(type="Xlib")
 keyPressed <- 'x'
@@ -17,7 +18,7 @@ readkeygraph <- function(prompt){
 onKeybd <- function(key){
 	keyPressed <<- key
 }
-aggDTFull <- tbl_df(read.csv("aggregation2.csv",stringsAsFactors=FALSE));
+aggDTFull <- tbl_df(read.csv("aggregation2.csv"));
 aggDTFull <- aggDTFull %>% 
 		mutate(
 		       Start.Time=origin+(Start.Time/1000),
@@ -47,8 +48,8 @@ for(curCol in colnames(aggDTFull)){
 aggDT0 <- aggDTFull %>%
 	select(-c(exclude[exclude != which(colnames(aggDTFull) == "AM.Host")]))
 # all columns compared against all columns
-colIdxA <- 1
-colIdxB <- 2
+colIdxA <- length(colnames(aggDT0))
+colIdxB <- 31
 while(keyPressed != 'q'){
 	skip <- 0
 	if(   class(aggDT0[[1,colIdxA]]) != "integer" 
@@ -64,40 +65,35 @@ while(keyPressed != 'q'){
 		skip <- 1
 	}
 	if(!skip){
-		naHostA <- (aggDT0 %>% filter(!is.na(colIdxA) && !is.na(colIdxB) && AM.Host == "") %>% select(colIdxA))[[1]]
-		naHostB <- (aggDT0 %>% filter(!is.na(colIdxA) && !is.na(colIdxB) && AM.Host == "") %>% select(colIdxB))[[1]]
-		allHostsA <- (aggDT0 %>% filter(!is.na(colIdxA) && !is.na(colIdxB)) %>% select(colIdxA))[[1]]
-		allHostsB <- (aggDT0 %>% filter(!is.na(colIdxA) && !is.na(colIdxB)) %>% select(colIdxB))[[1]]
-		par(mfrow=c(3,2))
 		curColA <- colnames(aggDT0)[colIdxA]
 		curColB <- colnames(aggDT0)[colIdxB]
-		plot(naHostA,naHostB,xlab=curColA,ylab=curColB,main=paste("Host not specified:",curColA,"vs",curColB,sep=" "))
-		abline(lm(naHostB~naHostA),col="blue")
-		plot(allHostsA,allHostsB,xlab=curColA,ylab=curColB,main=paste("All hosts:",curColA,"vs",curColB,sep=" "))
-		abline(lm(allHostsB~allHostsA),col="blue")
-		for(host in unique((aggDT0 %>% filter(AM.Host != "") %>% select(AM.Host))[[1]])){
-			print(paste(host,curColA,curColB,colIdxA,colIdxB))
-			cHostA <- (aggDT0 %>% filter(!is.na(colIdxA) & !is.na(colIdxB) & AM.Host == host) %>% select(colIdxA))[[1]]
-			cHostB <- (aggDT0 %>% filter(!is.na(colIdxA) & !is.na(colIdxB) & AM.Host == host) %>% select(colIdxB))[[1]]
-			plot(cHostA,cHostB,xlab=curColA,ylab=curColB,main=paste(host,curColA,"vs",curColB,sep=" "))
-			abline(lm(cHostB~cHostA),col="blue")
-		}
+		print(ggplot(aggDT0,aes_string(curColA,curColB))
+		      + geom_point(size=2,aes(color=AM.Host))
+		      + facet_grid(. ~ AM.Host)
+		      + geom_smooth(method="lm",size=1/3))
 	}
 	keyPressed <- readkeygraph("n,p,u,d")
 	if(keyPressed == 'n'){
-		colIdxB <- (colIdxB + 1) %% (ncol(aggDT0) + 1)
+		colIdxB <- (colIdxB + 1) %% ncol(aggDT0)
 	}
 	if(keyPressed == 'p'){
-		colIdxB <- (colIdxB - 1) %% (ncol(aggDT0) + 1)
+		colIdxB <- (colIdxB - 1) %% ncol(aggDT0)
 	}
 	if(keyPressed == 'u'){
-		colIdxA <- (colIdxA + 1) %% (ncol(aggDT0) + 1)
+		colIdxA <- (colIdxA + 1) %% ncol(aggDT0)
 	}
 	if(keyPressed == 'd'){
-		colIdxA <- (colIdxA - 1) %% (ncol(aggDT0) + 1)
+		colIdxA <- (colIdxA - 1) %% ncol(aggDT0)
+	}
+	if(keyPressed == 's'){
+		ggsave(paste(curColA,'-vs-',curColB,'.png',sep=""))
 	}
 	if(colIdxA == colIdxB){
-		colIdxB <- colIdxB + (keyPressed == 'n'?1:-1)
+		if(keyPressed == 'n'){
+			colIdxB <- colIdxB + 1
+		}else{
+			colIdxB <- colIdxB - 1
+		}
 	}
 	if(colIdxA == 0){
 		colIdxA <- ncol(aggDT0)
